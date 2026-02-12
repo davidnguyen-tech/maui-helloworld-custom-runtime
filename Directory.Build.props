@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <!-- Path to crossgen2 from local runtime build (maccatalyst) -->
+    <Crossgen2Path>/Users/user/repos/runtime/artifacts/bin/coreclr/maccatalyst.arm64.Release/arm64/crossgen2/crossgen2</Crossgen2Path>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Override runtime to use local build -->
+    <KnownFrameworkReference Update="Microsoft.NETCore.App"
+                             DefaultRuntimeFrameworkVersion="11.0.0-dev"
+                             LatestRuntimeFrameworkVersion="11.0.0-dev"
+                             TargetingPackVersion="11.0.0-dev" />
+  </ItemGroup>
+</Project>
