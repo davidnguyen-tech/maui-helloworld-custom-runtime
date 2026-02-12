@@ -66,8 +66,19 @@ $DOTNET build maui-helloworld-custom-runtime.csproj \
 ## Running on maccatalyst
 
 ```bash
+# Simple launch
 open bin/Debug/net11.0-maccatalyst/maccatalyst-arm64/maui-helloworld-custom-runtime.app
+
+# Launch with stdout/stderr captured, auto-kill after 5 seconds
+APP=bin/Debug/net11.0-maccatalyst/maccatalyst-arm64/maui-helloworld-custom-runtime.app
+> /tmp/maccatalyst-stdout.log
+open -a "$APP" --stdout /tmp/maccatalyst-stdout.log --stderr /tmp/maccatalyst-stderr.log
+sleep 5
+kill $(pgrep -f maui-helloworld-custom-runtime) 2>/dev/null
 ```
+
+> **Note:** `open --stdout` appends to the file. Truncate it (`> file`)
+> before each run to get clean logs.
 
 ## Running on iOS device
 
@@ -77,11 +88,14 @@ xcrun devicectl device install app \
   --device <DEVICE-UUID> \
   bin/Debug/net11.0-ios/ios-arm64/maui-helloworld-custom-runtime.app
 
-# Launch with console output
+# Launch with console output, auto-kill after 5 seconds
 xcrun devicectl device process launch \
   --device <DEVICE-UUID> \
   --console --terminate-existing \
-  com.companyname.mauihelloworldcustomruntime
+  com.companyname.mauihelloworldcustomruntime > /tmp/ios-interp.log 2>&1 &
+LAUNCH_PID=$!
+sleep 5
+kill $LAUNCH_PID 2>/dev/null
 ```
 
 ## Clearing NuGet cache after runtime rebuild
