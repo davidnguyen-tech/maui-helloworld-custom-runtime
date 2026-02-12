@@ -6,6 +6,10 @@ public static class MauiProgram
 {
 	public static MauiApp CreateMauiApp()
 	{
+		// Exercise DllImport vs LibraryImport for interpreter fallback comparison
+		NativeInterop.DllImportCaller.RunAll();
+		NativeInterop.LibraryImportCaller.RunAll();
+
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()

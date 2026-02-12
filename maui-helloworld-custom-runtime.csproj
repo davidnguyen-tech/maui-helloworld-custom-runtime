@@ -18,6 +18,7 @@
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
 
 		<!-- Display name -->
@@ -61,6 +62,20 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="11.0.0-preview.2.26103.111" />
+	</ItemGroup>
+
+	<!-- Link native library -->
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+		<NativeReference Include="native-lib/bin/libnativelib-ios.a">
+			<Kind>Static</Kind>
+			<ForceLoad>true</ForceLoad>
+		</NativeReference>
+	</ItemGroup>
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+		<NativeReference Include="native-lib/bin/libnativelib-maccatalyst.a">
+			<Kind>Static</Kind>
+			<ForceLoad>true</ForceLoad>
+		</NativeReference>
 	</ItemGroup>
 
 </Project>
