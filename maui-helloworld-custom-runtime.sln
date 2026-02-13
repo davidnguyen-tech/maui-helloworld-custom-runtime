@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "maui-helloworld-custom-runtime", "maui-helloworld-custom-runtime.csproj", "{B7B4CB59-BA43-764B-77DC-77276A3C196D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B7B4CB59-BA43-764B-77DC-77276A3C196D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7B4CB59-BA43-764B-77DC-77276A3C196D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7B4CB59-BA43-764B-77DC-77276A3C196D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7B4CB59-BA43-764B-77DC-77276A3C196D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7372C033-47D9-4EDF-AD80-D77F76F46713}
+	EndGlobalSection
+EndGlobal

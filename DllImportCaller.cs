@@ -25,6 +25,7 @@ public struct Rect2D
 public static class DllImportCaller
 {
     private const string Lib = "__Internal";
+    private const string LibObjC = "/usr/lib/libobjc.dylib";
 
     [DllImport(Lib)]
     public static extern int native_add(int a, int b);
@@ -43,6 +44,22 @@ public static class DllImportCaller
 
     [DllImport(Lib)]
     public static extern Rect2D native_rect_offset(Rect2D r, Point2D offset);
+
+    // --- objc_msgSend experiments ---
+    // These mimic how dotnet/macios bindings declare objc_msgSend.
+    // All signatures are fully blittable (nint only).
+
+    // Test A: objc_msgSend via libobjc.dylib (should force IL stub)
+    [DllImport(LibObjC, EntryPoint = "objc_msgSend")]
+    public static extern nint objc_msgSend_nint(nint receiver, nint selector);
+
+    // Test B: same blittable signature but via __Internal (should NOT force IL stub)
+    [DllImport(Lib, EntryPoint = "native_add")]
+    public static extern nint internal_nint_nint(nint a, nint b);
+
+    // Test C: objc_msgSend with 3 args
+    [DllImport(LibObjC, EntryPoint = "objc_msgSend")]
+    public static extern nint objc_msgSend_nint_nint(nint receiver, nint selector, nint arg1);
 
     public static void RunAll()
     {
@@ -67,5 +84,29 @@ public static class DllImportCaller
         var offset = new Point2D { X = 5, Y = 5 };
         var moved = native_rect_offset(rect, offset);
         Console.WriteLine($"[DllImport] native_rect_offset = ({moved.X}, {moved.Y}, {moved.Width}, {moved.Height})");
+
+        // --- objc_msgSend experiments ---
+        // Get a real ObjC class and selector to call safely
+        var nsObjectClass = ObjCRuntime.Runtime.GetNSObject(ObjCRuntime.Class.GetHandle("NSObject"));
+        nint classHandle = ObjCRuntime.Class.GetHandle("NSObject");
+        nint allocSel = ObjCRuntime.Selector.GetHandle("alloc");
+        nint releaseSel = ObjCRuntime.Selector.GetHandle("release");
+        nint retainCountSel = ObjCRuntime.Selector.GetHandle("retainCount");
+
+        // Test A: objc_msgSend via libobjc → expect IL stub
+        nint obj = objc_msgSend_nint(classHandle, allocSel);
+        Console.WriteLine($"[DllImport] objc_msgSend(NSObject, alloc) = 0x{obj:X}");
+
+        // Test B: same signature via __Internal → expect no IL stub
+        nint addResult = internal_nint_nint(3, 4);
+        Console.WriteLine($"[DllImport] internal_nint_nint(3, 4) = {addResult}");
+
+        // Test C: objc_msgSend with 3 args → expect IL stub
+        nint retainCount = objc_msgSend_nint_nint(obj, retainCountSel, 0);
+        Console.WriteLine($"[DllImport] objc_msgSend(obj, retainCount, 0) = {retainCount}");
+
+        // Release the object
+        objc_msgSend_nint(obj, releaseSel);
+        Console.WriteLine("[DllImport] objc_msgSend(obj, release) done");
     }
 }
