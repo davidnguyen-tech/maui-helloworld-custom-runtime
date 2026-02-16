@@ -46,20 +46,38 @@ public static class DllImportCaller
     public static extern Rect2D native_rect_offset(Rect2D r, Point2D offset);
 
     // --- objc_msgSend experiments ---
-    // These mimic how dotnet/macios bindings declare objc_msgSend.
-    // All signatures are fully blittable (nint only).
+    // Testing which combination of library + entrypoint forces IL stubs.
+    // The runtime checks: library == "/usr/lib/libobjc.dylib" AND
+    // entrypoint starts with "objc_msgSend".
 
-    // Test A: objc_msgSend via libobjc.dylib (should force IL stub)
+    // Test A: libobjc + objc_msgSend → EXPECT stub (both conditions match)
     [DllImport(LibObjC, EntryPoint = "objc_msgSend")]
-    public static extern nint objc_msgSend_nint(nint receiver, nint selector);
+    public static extern nint test_A_libobjc_msgSend(nint a, nint b);
 
-    // Test B: same blittable signature but via __Internal (should NOT force IL stub)
+    // Test B: __Internal + native_add → EXPECT no stub (neither condition)
     [DllImport(Lib, EntryPoint = "native_add")]
-    public static extern nint internal_nint_nint(nint a, nint b);
+    public static extern nint test_B_internal_native(nint a, nint b);
 
-    // Test C: objc_msgSend with 3 args
-    [DllImport(LibObjC, EntryPoint = "objc_msgSend")]
-    public static extern nint objc_msgSend_nint_nint(nint receiver, nint selector, nint arg1);
+    // Test C: libobjc + objc_msgSendSuper → EXPECT stub (both conditions)
+    [DllImport(LibObjC, EntryPoint = "objc_msgSendSuper")]
+    public static extern nint test_C_libobjc_msgSendSuper(nint a, nint b);
+
+    // Test D: libobjc + sel_registerName → EXPECT no stub (library matches but entrypoint doesn't)
+    [DllImport(LibObjC, EntryPoint = "sel_registerName")]
+    public static extern nint test_D_libobjc_selRegister(nint name);
+
+    // Test E: __Internal + entrypoint named "objc_msgSend" → EXPECT no stub (entrypoint matches but library doesn't)
+    // We point it at native_add since __Internal!objc_msgSend doesn't exist
+    [DllImport(Lib, EntryPoint = "native_add")]
+    public static extern nint test_E_internal_fakeObjc(nint a, nint b);
+
+    // Test F: libobjc + class_getName → EXPECT no stub (library matches but entrypoint doesn't)
+    [DllImport(LibObjC, EntryPoint = "class_getName")]
+    public static extern nint test_F_libobjc_className(nint cls);
+
+    // Test G: SetLastError=true on __Internal → EXPECT stub (SetLastError forces it)
+    [DllImport(Lib, EntryPoint = "native_add", SetLastError = true)]
+    public static extern nint test_G_setLastError(nint a, nint b);
 
     public static void RunAll()
     {
@@ -86,27 +104,38 @@ public static class DllImportCaller
         Console.WriteLine($"[DllImport] native_rect_offset = ({moved.X}, {moved.Y}, {moved.Width}, {moved.Height})");
 
         // --- objc_msgSend experiments ---
-        // Get a real ObjC class and selector to call safely
-        var nsObjectClass = ObjCRuntime.Runtime.GetNSObject(ObjCRuntime.Class.GetHandle("NSObject"));
         nint classHandle = ObjCRuntime.Class.GetHandle("NSObject");
         nint allocSel = ObjCRuntime.Selector.GetHandle("alloc");
         nint releaseSel = ObjCRuntime.Selector.GetHandle("release");
-        nint retainCountSel = ObjCRuntime.Selector.GetHandle("retainCount");
 
-        // Test A: objc_msgSend via libobjc → expect IL stub
-        nint obj = objc_msgSend_nint(classHandle, allocSel);
-        Console.WriteLine($"[DllImport] objc_msgSend(NSObject, alloc) = 0x{obj:X}");
+        // Test A: libobjc + objc_msgSend → expect stub
+        nint obj = test_A_libobjc_msgSend(classHandle, allocSel);
+        Console.WriteLine($"[Test A] libobjc+msgSend = 0x{obj:X}");
 
-        // Test B: same signature via __Internal → expect no IL stub
-        nint addResult = internal_nint_nint(3, 4);
-        Console.WriteLine($"[DllImport] internal_nint_nint(3, 4) = {addResult}");
+        // Test B: __Internal + native_add → expect no stub
+        Console.WriteLine($"[Test B] internal+native = {test_B_internal_native(3, 4)}");
 
-        // Test C: objc_msgSend with 3 args → expect IL stub
-        nint retainCount = objc_msgSend_nint_nint(obj, retainCountSel, 0);
-        Console.WriteLine($"[DllImport] objc_msgSend(obj, retainCount, 0) = {retainCount}");
+        // Test C: libobjc + objc_msgSendSuper → expect stub
+        // Can't safely call msgSendSuper without a proper super struct, just declare
+        // it to see if the stub is generated. Skip actual call.
+        Console.WriteLine("[Test C] libobjc+msgSendSuper — declared only");
 
-        // Release the object
-        objc_msgSend_nint(obj, releaseSel);
-        Console.WriteLine("[DllImport] objc_msgSend(obj, release) done");
+        // Test D: libobjc + sel_registerName → expect no stub
+        nint sel = test_D_libobjc_selRegister(allocSel);
+        Console.WriteLine($"[Test D] libobjc+selRegister = 0x{sel:X}");
+
+        // Test E: __Internal + "native_add" (pretend objc_msgSend) → expect no stub
+        Console.WriteLine($"[Test E] internal+fakeObjc = {test_E_internal_fakeObjc(10, 20)}");
+
+        // Test F: libobjc + class_getName → expect no stub
+        nint name = test_F_libobjc_className(classHandle);
+        Console.WriteLine($"[Test F] libobjc+className = 0x{name:X}");
+
+        // Test G: SetLastError=true → expect stub
+        Console.WriteLine($"[Test G] setLastError = {test_G_setLastError(5, 6)}");
+
+        // Cleanup
+        test_A_libobjc_msgSend(obj, releaseSel);
+        Console.WriteLine("[Tests] done");
     }
 }
