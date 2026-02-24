@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace NativeInterop;
 
@@ -79,6 +80,39 @@ public static class DllImportCaller
     [DllImport(Lib, EntryPoint = "native_add", SetLastError = true)]
     public static extern nint test_G_setLastError(nint a, nint b);
 
+    // --- Additional blittable objc_msgSend variants (should be R2R compiled) ---
+
+    // Test H: blittable, 3rd arg is byte
+    [DllImport(LibObjC, EntryPoint = "objc_msgSend")]
+    public static extern nint test_H_msgSend_byte(nint self, nint sel, byte value);
+
+    // Test I: blittable, 4 nint args
+    [DllImport(LibObjC, EntryPoint = "objc_msgSend")]
+    public static extern nint test_I_msgSend_4arg(nint self, nint sel, nint arg1, nint arg2);
+
+    // Test J: blittable, double arg
+    [DllImport(LibObjC, EntryPoint = "objc_msgSend")]
+    public static extern nint test_J_msgSend_double(nint self, nint sel, double value);
+
+    // --- Non-blittable objc_msgSend variants (should fall back to interpreter) ---
+
+    // Test K: non-blittable, string arg requires ANSI marshalling
+    [DllImport(LibObjC, EntryPoint = "objc_msgSend", CharSet = CharSet.Ansi)]
+    public static extern nint test_K_msgSend_string(nint self, nint sel, string value);
+
+    // Test L: non-blittable, byte[] array requires marshalling
+    [DllImport(LibObjC, EntryPoint = "objc_msgSend")]
+    public static extern nint test_L_msgSend_bytearray(nint self, nint sel, [MarshalAs(UnmanagedType.LPArray)] byte[] data, int length);
+
+    // Test M: non-blittable, StringBuilder requires marshalling
+    [DllImport(LibObjC, EntryPoint = "objc_msgSend", CharSet = CharSet.Ansi)]
+    public static extern nint test_M_msgSend_stringbuilder(nint self, nint sel, StringBuilder sb);
+
+    // --- ObjC exception propagation test ---
+
+    [DllImport(LibObjC, EntryPoint = "sel_registerName")]
+    public static extern nint sel_registerName(string name);
+
     public static void RunAll()
     {
         Console.WriteLine("[DllImport] native_add(3, 4) = " + native_add(3, 4));
@@ -136,6 +170,60 @@ public static class DllImportCaller
 
         // Cleanup
         test_A_libobjc_msgSend(obj, releaseSel);
-        Console.WriteLine("[Tests] done");
+        Console.WriteLine("[Tests A-G] done");
+
+        // --- Additional blittable tests (H, I, J) ---
+        // These call real ObjC methods on NSObject with extra args.
+        // The extra args are ignored by the selector but exercise the R2R stub generation.
+        nint obj2 = test_A_libobjc_msgSend(classHandle, allocSel);
+        nint initSel = ObjCRuntime.Selector.GetHandle("init");
+        obj2 = test_A_libobjc_msgSend(obj2, initSel);
+
+        nint hashSel = ObjCRuntime.Selector.GetHandle("hash");
+        nint descSel = ObjCRuntime.Selector.GetHandle("description");
+
+        // Test H: blittable byte arg — call [obj hash] (ignores extra arg but exercises stub)
+        nint hResult = test_H_msgSend_byte(obj2, hashSel, 0);
+        Console.WriteLine($"[Test H] msgSend+byte = 0x{hResult:X}");
+
+        // Test I: blittable 4-arg — call [obj hash] (extra args ignored)
+        nint iResult = test_I_msgSend_4arg(obj2, hashSel, 0, 0);
+        Console.WriteLine($"[Test I] msgSend+4arg = 0x{iResult:X}");
+
+        // Test J: blittable double arg — call [obj hash] (extra arg ignored)
+        nint jResult = test_J_msgSend_double(obj2, hashSel, 0.0);
+        Console.WriteLine($"[Test J] msgSend+double = 0x{jResult:X}");
+
+        // --- Non-blittable tests (K, L, M) ---
+        // These are declared to force crossgen2 to attempt R2R compilation.
+        // The R2R PInvokeILEmitter can't handle non-blittable types and should
+        // throw RequiresRuntimeJitException, falling back to interpreter.
+        // We don't actually call them with meaningful ObjC selectors — just verify
+        // the declarations exist and the app doesn't crash.
+        Console.WriteLine("[Test K] msgSend+string — declared (non-blittable, expect interpreter fallback)");
+        Console.WriteLine("[Test L] msgSend+byte[] — declared (non-blittable, expect interpreter fallback)");
+        Console.WriteLine("[Test M] msgSend+StringBuilder — declared (non-blittable, expect interpreter fallback)");
+
+        // --- ObjC exception propagation test ---
+        // Send an unrecognized selector to NSObject. ObjC raises NSInvalidArgumentException.
+        // With pending exception check: should become a .NET exception.
+        // Without it (reviewer's change): exception silently lost.
+        Console.WriteLine("[EXCEPTION TEST] Sending unrecognized selector to NSObject...");
+        nint obj3 = test_A_libobjc_msgSend(classHandle, allocSel);
+        obj3 = test_A_libobjc_msgSend(obj3, initSel);
+        nint bogusSel = sel_registerName("bogusSelector_thatDoesNotExist");
+        try
+        {
+            test_A_libobjc_msgSend(obj3, bogusSel);
+            Console.WriteLine("[EXCEPTION TEST] NO exception caught — pending exception check MISSING ❌");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EXCEPTION TEST] Exception caught: {ex.GetType().Name}: {ex.Message} — pending exception check WORKS ✅");
+        }
+
+        test_A_libobjc_msgSend(obj2, releaseSel);
+        test_A_libobjc_msgSend(obj3, releaseSel);
+        Console.WriteLine("[All tests] done");
     }
 }
