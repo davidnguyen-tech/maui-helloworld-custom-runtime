@@ -195,14 +195,38 @@ public static class DllImportCaller
         Console.WriteLine($"[Test J] msgSend+double = 0x{jResult:X}");
 
         // --- Non-blittable tests (K, L, M) ---
-        // These are declared to force crossgen2 to attempt R2R compilation.
-        // The R2R PInvokeILEmitter can't handle non-blittable types and should
-        // throw RequiresRuntimeJitException, falling back to interpreter.
-        // We don't actually call them with meaningful ObjC selectors — just verify
-        // the declarations exist and the app doesn't crash.
-        Console.WriteLine("[Test K] msgSend+string — declared (non-blittable, expect interpreter fallback)");
-        Console.WriteLine("[Test L] msgSend+byte[] — declared (non-blittable, expect interpreter fallback)");
-        Console.WriteLine("[Test M] msgSend+StringBuilder — declared (non-blittable, expect interpreter fallback)");
+        // Call these to force runtime stub generation for non-blittable objc_msgSend.
+        // Uses [obj hash] selector — extra args are ignored by ObjC but exercise the marshalling path.
+        try
+        {
+            test_K_msgSend_string(obj2, hashSel, "hello");
+            Console.WriteLine("[Test K] msgSend+string — called OK");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Test K] msgSend+string — exception: {ex.GetType().Name}");
+        }
+
+        try
+        {
+            test_L_msgSend_bytearray(obj2, hashSel, new byte[] { 1, 2, 3 }, 3);
+            Console.WriteLine("[Test L] msgSend+byte[] — called OK");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Test L] msgSend+byte[] — exception: {ex.GetType().Name}");
+        }
+
+        try
+        {
+            var sb = new StringBuilder("test");
+            test_M_msgSend_stringbuilder(obj2, hashSel, sb);
+            Console.WriteLine("[Test M] msgSend+StringBuilder — called OK");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Test M] msgSend+StringBuilder — exception: {ex.GetType().Name}");
+        }
 
         // --- ObjC exception propagation test ---
         // Send an unrecognized selector to NSObject. ObjC raises NSInvalidArgumentException.
